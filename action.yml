@@ -1,0 +1,75 @@
+name: Pull Schema
+description: Pull your data model into the repository — per-table DDL plus a ready Flyway migration for every change, as a pull request.
+author: Pull Schema
+branding:
+  icon: git-pull-request
+  color: red
+
+inputs:
+  token:
+    description: Pull Schema machine token (store it as a secret). Read-only by design.
+    required: true
+  model:
+    description: The model id — the number in the model's address.
+    required: true
+  url:
+    description: Your Pull Schema address. Change it only for a self-hosted installation.
+    default: https://pullschema.com
+  path:
+    description: Folder in the repository that receives schema/, migrations/ and the model file.
+    default: db
+  dialect:
+    description: Generate for another database (mysql, postgres, oracle, sqlserver, bigquery, snowflake). Only on the folder's first run; empty = the model's own.
+    default: ''
+  mode:
+    description: "'offline' (maintenance window, the default) or 'online' (the target stays up: slower, lock-avoiding statements)."
+    default: offline
+  force:
+    description: Generate even if the model has errors that no database accepts.
+    default: 'false'
+  pull-request:
+    description: Open (or update) a pull request with the changes. 'false' only writes the files, for your own next step.
+    default: 'true'
+  branch:
+    description: Branch used for the pull request.
+    default: pullschema/schema
+
+outputs:
+  changed:
+    description: "'true' when the model changed since what the repository has."
+    value: ${{ steps.pull.outputs.changed }}
+  migration:
+    description: File name of the new migration (e.g. V003__sales.sql), empty when the change needs no DDL.
+    value: ${{ steps.pull.outputs.migration }}
+  manual-steps:
+    description: How many changes the database cannot make by command — explained, commented, inside the migration.
+    value: ${{ steps.pull.outputs.manual-steps }}
+  pull-request-url:
+    description: Address of the pull request, when one was opened or updated.
+    value: ${{ steps.pr.outputs.pull-request-url }}
+
+runs:
+  using: composite
+  steps:
+    - id: pull
+      shell: bash
+      env:
+        PS_TOKEN: ${{ inputs.token }}
+        PS_MODEL: ${{ inputs.model }}
+        PS_URL: ${{ inputs.url }}
+        PS_PATH: ${{ inputs.path }}
+        PS_DIALECT: ${{ inputs.dialect }}
+        PS_MODE: ${{ inputs.mode }}
+        PS_FORCE: ${{ inputs.force }}
+      run: bash "$GITHUB_ACTION_PATH/pull.sh"
+
+    - id: pr
+      if: inputs.pull-request == 'true' && steps.pull.outputs.changed == 'true'
+      uses: peter-evans/create-pull-request@v7
+      with:
+        branch: ${{ inputs.branch }}
+        add-paths: ${{ inputs.path }}
+        commit-message: 'Schema: ${{ steps.pull.outputs.migration || format(''model {0} updated'', inputs.model) }}'
+        title: 'Schema: ${{ steps.pull.outputs.migration || format(''model {0} updated'', inputs.model) }}'
+        body: ${{ steps.pull.outputs.body }}
+        delete-branch: true

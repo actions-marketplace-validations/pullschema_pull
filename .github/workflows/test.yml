@@ -1,0 +1,29 @@
+# Self-test: no secret, no server. Checks the script and the refusals that
+# must happen before anything touches the network.
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck pull.sh
+      - name: refuses what it must refuse
+        run: |
+          set +e
+          expect_fail() { if bash pull.sh >/tmp/o 2>&1; then echo "SHOULD HAVE FAILED: $*"; exit 1; fi; grep -q "$1" /tmp/o || { cat /tmp/o; exit 1; }; }
+          PS_TOKEN= PS_MODEL=1                       expect_fail 'token is empty'
+          PS_TOKEN=x PS_MODEL=abc                    expect_fail 'must be the model id'
+          PS_TOKEN=x PS_MODEL=1 PS_URL=http://x.test expect_fail 'must start with https'
+          PS_TOKEN=x PS_MODEL=1 PS_MODE=now          expect_fail "'mode' is"
+          echo "all refusals OK"
+      - name: the action runs and reports a refused token cleanly
+        id: bad
+        continue-on-error: true
+        uses: ./
+        with:
+          token: ps_invalid
+          model: 1
+          pull-request: 'false'
+      - run: test "${{ steps.bad.outcome }}" = failure
