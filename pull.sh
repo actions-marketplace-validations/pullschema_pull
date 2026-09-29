@@ -9,6 +9,8 @@
 #   PS_DIALECT  empty = the model's own
 #   PS_MODE     offline | online                  default offline
 #   PS_FORCE    true | false                      default false
+#   PS_LAYOUT   classico | simples | ssdt | redgate — first run only; after
+#               that the repository's .pullschema.json remembers it
 #
 # Exit codes: 0 = done (changed or not), 1 = the server refused or failed.
 set -euo pipefail
@@ -37,6 +39,7 @@ mkdir -p "$PS_PATH"
 args=(-F "dbms=${PS_DIALECT:-}")
 [ "$PS_MODE" = online ] && args+=(-F "modo=quente")
 [ "${PS_FORCE:-false}" = true ] && args+=(-F "force=1")
+[ -n "${PS_LAYOUT:-}" ] && args+=(-F "layout=$PS_LAYOUT")
 # What the repository already has is the left side of the comparison: the
 # migration is the difference between it and the model as it is now.
 [ -f "$PS_PATH/modelo.pullschema.json" ] && args+=(-F "modelo=@$PS_PATH/modelo.pullschema.json")
@@ -59,15 +62,27 @@ case "$code" in
   *)   fail "HTTP $code: $(head -c 800 "$tmp/body")" ;;
 esac
 
-# A table that left the model has to leave the repository too.
-rm -rf "$PS_PATH/schema"
+# A table that left the model has to leave the repository too: the server
+# lists the folders it owns (this layout's and the previous one's), and each
+# one is checked again here before rm -rf — never absolute, never "..", never
+# a dot-folder, never the numbered migrations.
+limpar="$(header x-pullschema-limpar)"
+if [ -z "$limpar" ]; then limpar="schema"; fi
+IFS='|' read -r -a pastas <<< "$limpar"
+for d in "${pastas[@]}"; do
+  case "$d" in
+    ''|/*|*..*|.*|*/.*|migrations|migrations/) printf '::warning::Refused to clean folder "%s".\n' "$d" ;;
+    migrations/*) [ "$d" = "migrations/repetiveis" ] && rm -rf "${PS_PATH:?}/$d" ;;
+    *) rm -rf "${PS_PATH:?}/$d" ;;
+  esac
+done
 unzip -oq "$tmp/body" -d "$PS_PATH"
 
 migration="$(header x-pullschema-migracao)"
 manual="$(header x-pullschema-passos-manuais)"; manual="${manual:-0}"
-tables=$(find "$PS_PATH/schema" -name '*.sql' 2>/dev/null | wc -l | tr -d ' ')
+tables=$(unzip -Z1 "$tmp/body" | grep -c '\.sql$' || true)
 
-say "Model $PS_MODEL pulled into $PS_PATH/: $tables table file(s)${migration:+, migration $migration}."
+say "Model $PS_MODEL pulled into $PS_PATH/: $tables SQL file(s)${migration:+, migration $migration}."
 [ "$manual" != 0 ] && printf '::warning::%s change(s) cannot be made by command on this database — see the comments marked in %s.\n' "$manual" "${migration:-the migration}"
 
 out changed true
@@ -84,7 +99,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     else
       echo "- **No migration:** the change needs no DDL (a description, a diagram position)."
     fi
-    echo "- **Current state:** \`$PS_PATH/schema/\` ($tables table file(s))"
+    echo "- **Current state:** $tables SQL file(s) under \`$PS_PATH/\`"
     if [ "$manual" != 0 ]; then
       echo
       echo "> **$manual change(s) the database cannot make by command.** They are explained, commented, inside the migration — review them before merging."
