@@ -30,6 +30,45 @@ model as it is now. Nothing changed → nothing happens: no commit, no pull
 request. Files in `schema/` carry no timestamp, so re-running never "changes" a
 table.
 
+## Folder layout
+
+By default the repository gets `schema/<TABLE>.sql` for tables, and views and
+routines live only in the migrations. Teams that already version databases
+usually split by object type — pick the layout you use:
+
+| `layout` | Tables | Views | Procedures | File name |
+|---|---|---|---|---|
+| `classico` (default) | `schema/` | — | — | `CUSTOMER.sql` |
+| `simples` | `schema/tables/` | `schema/views/` | `schema/procedures/` | `CUSTOMER.sql` |
+| `ssdt` (Visual Studio database project) | `dbo/Tables/` | `dbo/Views/` | `dbo/Stored Procedures/` | `CUSTOMER.sql` |
+| `redgate` | `Tables/` | `Views/` | `Stored Procedures/` | `dbo.CUSTOMER.sql` |
+
+Functions, triggers and sequences follow the same pattern. Set it once with the
+`layout` input; from then on it lives in the repository's `.pullschema.json`,
+where you can also write your own map:
+
+```json
+{
+  "pastas": {
+    "tabela": "database/{owner}/tables",
+    "view": "database/{owner}/views",
+    "procedure": "database/{owner}/procs"
+  },
+  "arquivo": "{owner}.{nome}",
+  "repetiveis": true
+}
+```
+
+A type the map does not mention gets no file. `{owner}` is the object's schema
+(`dbo` on SQL Server when none is set). Changing the layout moves the files in
+the next pull request — no migration is generated for that.
+
+**`"repetiveis": true`** writes views and routines as Flyway *repeatable*
+migrations (`migrations/repetiveis/R__1_dbo_V_SALES.sql`), each one dropping
+and recreating its object so it can run again. The numbered migrations then
+carry only tables and the objects that were removed — Flyway does not drop an
+object whose `R__` file disappeared.
+
 ## Complete workflow
 
 ```yaml
@@ -68,6 +107,7 @@ Setup, once:
 | `path` | `db` | folder that receives the files |
 | `dialect` | the model's | `mysql`, `postgres`, `oracle`, `sqlserver`, `bigquery`, `snowflake` — first run only |
 | `mode` | `offline` | `online` = statements for a database that stays up (slower, avoid locks) |
+| `layout` | `classico` | `simples`, `ssdt`, `redgate` — first run only, see [Folder layout](#folder-layout) |
 | `force` | `false` | generate even when the model has errors no database accepts |
 | `pull-request` | `true` | `false` only writes the files, for your own next step |
 | `branch` | `pullschema/schema` | branch of the pull request |
@@ -100,7 +140,7 @@ command — explained inside the migration), `pull-request-url`.
 
 `pull.sh` is the whole step and depends only on `bash`, `curl` and `unzip`.
 Set `PS_TOKEN`, `PS_MODEL` (and optionally `PS_URL`, `PS_PATH`, `PS_DIALECT`,
-`PS_MODE`, `PS_FORCE`) and run it — GitLab, Azure DevOps, Jenkins. The
+`PS_MODE`, `PS_FORCE`, `PS_LAYOUT`) and run it — GitLab, Azure DevOps, Jenkins. The
 [help page](https://pullschema.com/en/ajuda/git) has a ready GitLab CI job.
 
 ## Security
