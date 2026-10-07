@@ -1,0 +1,45 @@
+name: Pull Schema — import
+description: Bring back into the Pull Schema model what the team merged into the repository's modelo.pullschema.json. The reverse of the main action; needs a WRITE token tied to one model.
+author: Pull Schema
+branding:
+  icon: git-merge
+  color: red
+
+inputs:
+  token:
+    description: Pull Schema WRITE token (store it as a secret), tied to this one model. A regular read-only token is refused.
+    required: true
+  model:
+    description: The model id — the number in the model's address.
+    required: true
+  url:
+    description: Your Pull Schema address. Change it only for a self-hosted installation.
+    default: https://pullschema.com
+  path:
+    description: Folder in the repository that holds modelo.pullschema.json and .pullschema.json.
+    default: db
+  apply:
+    description: "'false' = preview only, nothing changes. 'true' = apply (the previous state is saved as a model version first)."
+    default: 'false'
+  force:
+    description: Let the repository file win when the model also changed in Pull Schema after the last delivery.
+    default: 'false'
+
+outputs:
+  result:
+    description: "'unchanged' (nothing new), 'preview' or 'applied'."
+    value: ${{ steps.import.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - id: import
+      shell: bash
+      env:
+        PS_TOKEN: ${{ inputs.token }}
+        PS_MODEL: ${{ inputs.model }}
+        PS_URL: ${{ inputs.url }}
+        PS_PATH: ${{ inputs.path }}
+        PS_APPLY: ${{ inputs.apply }}
+        PS_FORCE: ${{ inputs.force }}
+      run: bash "$GITHUB_ACTION_PATH/import.sh"

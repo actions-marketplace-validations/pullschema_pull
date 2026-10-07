@@ -126,6 +126,33 @@ command — explained inside the migration), `pull-request-url`.
         run: echo "Review the manual steps in ${{ steps.schema.outputs.migration }}"
 ```
 
+## The way back: Git → model
+
+What the team edits in `modelo.pullschema.json` and merges can go back into the
+model with the `import` action. It needs a **WRITE** token (Tokens → *WRITE
+token*), tied to **one** model — the regular token only reads and is refused.
+
+```yaml
+on:
+  push:
+    branches: [main]
+    paths: ['db/modelo.pullschema.json']
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pullschema/pull/import@v1
+        with:
+          token: ${{ secrets.PULLSCHEMA_WRITE_TOKEN }}
+          model: 42
+          apply: true       # false = preview only
+```
+
+If the model also changed in Pull Schema after the last delivery, the run stops
+with a conflict; `force: true` lets the repository file win. Before every apply
+the server saves the model's previous state as a version.
+
 ## Two rules
 
 - **Do not edit a migration after it ran.** Flyway checks the checksum of every
@@ -145,8 +172,9 @@ Set `PS_TOKEN`, `PS_MODEL` (and optionally `PS_URL`, `PS_PATH`, `PS_DIALECT`,
 
 ## Security
 
-The token only reads: the package is built in memory and nothing in the model
-changes. It is sent only in the `Authorization` header, over `https` (plain
+The `pull` token only reads: the package is built in memory and nothing in the
+model changes. The `import` token is a separate WRITE token, tied to one model
+and one route. It is sent only in the `Authorization` header, over `https` (plain
 `http` is refused except for `localhost`). Each run is recorded in the
 account's audit trail as a model export.
 
