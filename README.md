@@ -180,4 +180,16 @@ account's audit trail as a model export.
 
 ## License
 
-[MIT](LICENSE)
+The code is under the [MIT](LICENSE) licence, © Excelência Setorial Soluções em
+Tecnologia da Informação e Telecomunicações Ltda.
+
+## Trademarks
+
+"Pull Schema" and its logo are trademarks of Excelência Setorial. The MIT licence
+covers the code only and **grants no right to use the name or the logo**: if you
+fork or redistribute a modified version, give it a different name and do not
+present it as the official Pull Schema action. Referring to Pull Schema to say
+that your work is compatible with it is fine.
+
+Used with the Pull Schema service, this action is part of the service and is
+covered by its [Terms of use](https://pullschema.com/en/termos).
