@@ -27,6 +27,9 @@ inputs:
   layout:
     description: "Folder layout for the first run: classico (schema/<TABLE>.sql), simples (schema/tables, schema/views…), ssdt ({owner}/Tables, {owner}/Views, {owner}/Stored Procedures…) or redgate (Tables/dbo.Name.sql…). After the first run the repository's .pullschema.json remembers it — edit it there to change."
     default: ''
+  write:
+    description: "'all' (the default) rewrites the generated folders and adds a numbered migration. 'changed' is for a folder that already holds your own database project (a Visual Studio .sqlproj, hand-written files): only the objects that changed are written, in the files where they already live, and the .sqlproj follows. Point 'path' at the project folder."
+    default: all
   force:
     description: Generate even if the model has errors that no database accepts.
     default: 'false'
@@ -65,6 +68,7 @@ runs:
         PS_MODE: ${{ inputs.mode }}
         PS_FORCE: ${{ inputs.force }}
         PS_LAYOUT: ${{ inputs.layout }}
+        PS_WRITE: ${{ inputs.write }}
       run: bash "$GITHUB_ACTION_PATH/pull.sh"
 
     - id: pr

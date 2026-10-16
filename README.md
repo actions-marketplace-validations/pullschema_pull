@@ -69,6 +69,41 @@ and recreating its object so it can run again. The numbered migrations then
 carry only tables and the objects that were removed — Flyway does not drop an
 object whose `R__` file disappeared.
 
+## A project you already have: write only what changed
+
+The layouts above **own** their folders: each run cleans them and writes every
+file again. That is right for a folder Pull Schema created. It is wrong for a
+database project your team has kept for years — a Visual Studio `.sqlproj`
+listing each file, subfolders someone made, a trigger inside its table's file.
+
+For that, set `write: changed` and point `path` at the project folder:
+
+```yaml
+      - uses: pullschema/pull@v1
+        with:
+          token: ${{ secrets.PULLSCHEMA_TOKEN }}
+          model: 42
+          path: Database/MyDb/MyDb      # the folder with the .sqlproj
+          layout: ssdt                  # where NEW objects go
+          write: changed
+```
+
+- The project's own files are the left side of the comparison: they are read
+  like a database and compared with the model. No model file, no state file.
+- Only the objects that changed are written, **in the file where they already
+  live** — a changed trigger replaces only its own batch inside the table's
+  file; the table stays as your team wrote it.
+- Names the model does not keep (the primary key's `PK_…`, `DF_…` defaults,
+  `CLUSTERED`) are taken from the file being replaced, so a deployment by
+  DACPAC does not drop and re-create them. Anything that would still leave the
+  file is listed in the pull request.
+- New objects go where `layout` says; removed objects are deleted; the
+  `.sqlproj` gains and loses exactly those lines and nothing else.
+- Only the files the project compiles (`<Build Include>`) are sent. Data
+  scripts (`<None Include>`) never leave the repository.
+- No numbered migration: the project is deployed by comparing it with the
+  database (DACPAC), which writes the `ALTER` itself.
+
 ## Complete workflow
 
 ```yaml
@@ -108,6 +143,7 @@ Setup, once:
 | `dialect` | the model's | `mysql`, `postgres`, `oracle`, `sqlserver`, `bigquery`, `snowflake` — first run only |
 | `mode` | `offline` | `online` = statements for a database that stays up (slower, avoid locks) |
 | `layout` | `classico` | `simples`, `ssdt`, `redgate` — first run only, see [Folder layout](#folder-layout) |
+| `write` | `all` | `changed` = only what changed, in place, for an existing project — see [above](#a-project-you-already-have-write-only-what-changed) |
 | `force` | `false` | generate even when the model has errors no database accepts |
 | `pull-request` | `true` | `false` only writes the files, for your own next step |
 | `branch` | `pullschema/schema` | branch of the pull request |
