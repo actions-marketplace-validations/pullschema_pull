@@ -103,6 +103,11 @@ For that, set `write: changed` and point `path` at the project folder:
   scripts (`<None Include>`) never leave the repository.
 - No numbered migration: the project is deployed by comparing it with the
   database (DACPAC), which writes the `ALTER` itself.
+- The project's `.refactorlog` is sent too, and comes back with the renames
+  the model has seen added at the end (the team's operations stay byte for
+  byte). With none, `<Project>.refactorlog` is created and declared in the
+  `.sqlproj`. The DACPAC then renames the column (`sp_rename`) instead of
+  dropping it and creating it empty.
 
 ## Complete workflow
 
