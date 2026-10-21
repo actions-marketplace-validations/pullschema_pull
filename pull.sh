@@ -57,7 +57,7 @@ if [ "$PS_WRITE" = changed ]; then
   for f in "$PS_PATH"/*.sqlproj; do [ -f "$f" ] && { proj="$f"; break; }; done
   # Only what the project compiles is sent: data scripts (<None Include>) stay in the repository.
   if [ -n "$proj" ] && ! grep -qiE '<Project[^>]*Sdk *=' "$proj"; then
-    grep -oE '<Build Include="[^"]*"' "$proj" | sed -e 's/^<Build Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\\' '/' \
+    grep -oE '<Build Include="[^"]*"' "$proj" | sed -e 's/^<Build Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\134' '/' \
       | while IFS= read -r p; do if [ -f "$PS_PATH/$p" ]; then printf '%s\n' "$p"; fi; done > "$tmp/list" || true
     basename "$proj" >> "$tmp/list"
   else
@@ -66,9 +66,19 @@ if [ "$PS_WRITE" = changed ]; then
     if [ -n "$proj" ]; then basename "$proj" >> "$tmp/list"; fi
   fi
   [ -s "$tmp/list" ] || fail "No .sql file found under '$PS_PATH'."
+  # The project's .refactorlog goes too (the one the .sqlproj declares, or one in the base folder): the server adds
+  # the model's renames to it, keeping the team's operations as they are.
+  rlog=""
+  if [ -n "$proj" ]; then
+    rlog=$(grep -oE '<RefactorLog Include="[^"]*"' "$proj" | head -n 1 | sed -e 's/^<RefactorLog Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\134' '/') || rlog=""
+  fi
+  if [ -z "$rlog" ]; then
+    for f in "$PS_PATH"/*.refactorlog; do [ -f "$f" ] && { rlog=$(basename "$f"); break; }; done
+  fi
+  if [ -n "$rlog" ] && [ -f "$PS_PATH/$rlog" ]; then printf '%s\n' "$rlog" >> "$tmp/list"; fi
   (cd "$PS_PATH" && zip -q -X "$tmp/repo.zip" -@ < "$tmp/list")
 
-  args=(-F "repo=@$tmp/repo.zip")
+  args=(-F "repo=@$tmp/repo.zip" -F "refactorlog=1")
   [ "${PS_FORCE:-false}" = true ] && args+=(-F "force=1")
   [ -n "${PS_LAYOUT:-}" ] && args+=(-F "layout=$PS_LAYOUT")
   code=$(curl -sS -X POST -o "$tmp/body" -D "$tmp/headers" -w '%{http_code}' \
