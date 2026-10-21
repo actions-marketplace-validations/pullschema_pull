@@ -57,7 +57,7 @@ if [ "$PS_WRITE" = changed ]; then
   for f in "$PS_PATH"/*.sqlproj; do [ -f "$f" ] && { proj="$f"; break; }; done
   # Only what the project compiles is sent: data scripts (<None Include>) stay in the repository.
   if [ -n "$proj" ] && ! grep -qiE '<Project[^>]*Sdk *=' "$proj"; then
-    grep -oE '<Build Include="[^"]*"' "$proj" | sed -e 's/^<Build Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\\' '/' \
+    grep -oE '<Build Include="[^"]*"' "$proj" | sed -e 's/^<Build Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\134' '/' \
       | while IFS= read -r p; do if [ -f "$PS_PATH/$p" ]; then printf '%s\n' "$p"; fi; done > "$tmp/list" || true
     basename "$proj" >> "$tmp/list"
   else
@@ -70,7 +70,7 @@ if [ "$PS_WRITE" = changed ]; then
   # the model's renames to it, keeping the team's operations as they are.
   rlog=""
   if [ -n "$proj" ]; then
-    rlog=$(grep -oE '<RefactorLog Include="[^"]*"' "$proj" | head -n 1 | sed -e 's/^<RefactorLog Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\\' '/') || rlog=""
+    rlog=$(grep -oE '<RefactorLog Include="[^"]*"' "$proj" | head -n 1 | sed -e 's/^<RefactorLog Include="//' -e 's/"$//' -e 's/&amp;/\&/g' | tr '\134' '/') || rlog=""
   fi
   if [ -z "$rlog" ]; then
     for f in "$PS_PATH"/*.refactorlog; do [ -f "$f" ] && { rlog=$(basename "$f"); break; }; done
